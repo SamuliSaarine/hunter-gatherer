@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from .auth import require_auth
 
 from game.state import GameState, Band, Character, SharedFiction
 from game.save_manager import save_game, load_game, list_saves
@@ -7,7 +8,7 @@ from game.permadeath import get_legacy
 from world.zones import create_starting_world
 from simulation.relationships import initialize_relationships
 
-router = APIRouter(prefix="/api")
+router = APIRouter(prefix="/api", dependencies=[Depends(require_auth)])
 
 # In-memory session store
 _sessions: dict[str, GameState] = {}

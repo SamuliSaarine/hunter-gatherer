@@ -1,7 +1,7 @@
 import { createStore } from "solid-js/store";
 import type { GameState, NarrativeEntry } from "../types";
 
-export type Screen = "start" | "game" | "death";
+export type Screen = "login" | "start" | "game" | "death";
 
 interface GameStore {
   gameState: GameState | null;
@@ -24,7 +24,7 @@ const [store, setStore] = createStore<GameStore>({
   isConnected: false,
   isDead: false,
   deathCause: null,
-  screen: "start",
+  screen: "login",
 });
 
 export { store, setStore };

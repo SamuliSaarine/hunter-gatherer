@@ -1,5 +1,6 @@
 import { Match, Switch } from "solid-js";
 import { store, setStore, addNarrativeEntry } from "./store/gameStore";
+import LoginScreen from "./components/LoginScreen";
 import StartScreen from "./components/StartScreen";
 import NarrativeScroll from "./components/NarrativeScroll";
 import PlayerInput from "./components/PlayerInput";
@@ -62,6 +63,9 @@ function DeathScreen() {
 export default function App() {
   return (
     <Switch>
+      <Match when={store.screen === "login"}>
+        <LoginScreen />
+      </Match>
       <Match when={store.screen === "start"}>
         <StartScreen />
       </Match>

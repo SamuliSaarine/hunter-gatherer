@@ -1,4 +1,5 @@
 import json
+import os
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from game.engine import pre_turn_tick, apply_gm_response, check_and_handle_death
@@ -11,6 +12,10 @@ ws_router = APIRouter()
 
 @ws_router.websocket("/ws/{session_id}")
 async def websocket_turn(websocket: WebSocket, session_id: str) -> None:
+    secret = os.environ.get("GAME_SECRET", "")
+    if secret and websocket.cookies.get("game_session") != secret:
+        await websocket.close(code=4001)
+        return
     await websocket.accept()
 
     try:

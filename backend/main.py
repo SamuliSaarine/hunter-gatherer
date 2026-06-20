@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from api.routes import router
 from api.websocket import ws_router
+from api.auth import auth_router
 
 # Docker layout: main.py at /app/, dist at /app/frontend/dist
 # Dev layout:    main.py at backend/, dist at ../frontend/dist
@@ -28,6 +29,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_router)
 app.include_router(router)
 app.include_router(ws_router)
 
