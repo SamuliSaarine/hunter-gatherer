@@ -15,7 +15,10 @@ export async function login(password: string): Promise<void> {
     credentials: "include",
     body: JSON.stringify({ password }),
   });
-  if (!res.ok) throw new Error("Wrong password");
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail ?? "Wrong password");
+  }
 }
 
 export async function logout(): Promise<void> {

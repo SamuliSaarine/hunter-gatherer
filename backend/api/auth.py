@@ -4,11 +4,14 @@ from pydantic import BaseModel
 
 auth_router = APIRouter(prefix="/auth")
 
-_SECRET = os.environ.get("GAME_SECRET", "")
+
+def _secret() -> str:
+    return os.environ.get("GAME_SECRET", "")
 
 
 def _is_authed(game_session: str | None) -> bool:
-    return bool(_SECRET and game_session == _SECRET)
+    s = _secret()
+    return bool(s and game_session == s)
 
 
 def require_auth(game_session: str | None = Cookie(default=None)) -> None:
@@ -22,11 +25,14 @@ class LoginRequest(BaseModel):
 
 @auth_router.post("/login")
 async def login(request: LoginRequest, response: Response) -> dict:
-    if not _SECRET or request.password != _SECRET:
+    s = _secret()
+    if not s:
+        raise HTTPException(status_code=500, detail="GAME_SECRET not configured on server")
+    if request.password != s:
         raise HTTPException(status_code=401, detail="Wrong password")
     response.set_cookie(
         key="game_session",
-        value=_SECRET,
+        value=s,
         httponly=True,
         secure=True,
         samesite="strict",

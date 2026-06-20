@@ -20,8 +20,8 @@ export default function LoginScreen() {
     try {
       await login(password());
       setStore("screen", "start");
-    } catch {
-      setError("Wrong password.");
+    } catch (e: any) {
+      setError(e.message ?? "Wrong password.");
       setPassword("");
     } finally {
       setLoading(false);
