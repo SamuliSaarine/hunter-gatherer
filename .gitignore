@@ -1,0 +1,9 @@
+.env
+saves/*.json
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+dist/
+.uv/
+*.egg-info/
