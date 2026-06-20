@@ -1,8 +1,8 @@
-import json
 import os
 from typing import AsyncGenerator
 
-from openai import AsyncOpenAI
+from pydantic_ai import Agent
+from pydantic_ai.models.mistral import MistralModel
 
 from game.state import GameState, GMResponse
 from .context_builder import build_context
@@ -27,42 +27,27 @@ YOUR ROLE:
 - Show the world as alive: weather changes, animals move, NPCs have their own concerns
 - In "brutal" difficulty: never suggest what the player should do next
 - Write vivid, anthropologically grounded prose. No anachronisms. No magic.
-- 2-4 paragraphs. End when the scene settles. Be honest about failure.
-- If the player does something unclear, interpret it charitably but realistically."""
+- 2-4 paragraphs. End when the scene settles. Be honest about failure."""
 
-DELTA_SYSTEM_PROMPT = """You are a game state parser. Given a narrative of what happened in a hunter-gatherer RPG, output ONLY a valid JSON object with state changes. No markdown. No explanation. Just JSON.
-
-Use exact character/fiction/zone IDs from the provided map. Use empty arrays when nothing changed.
-
-Schema:
-{
-  "narrative": "copy the full narrative here",
-  "stat_deltas": [{"character_id": "<exact_id>", "health_delta": 0.0, "hunger_delta": 0.0, "fatigue_delta": 0.0, "reputation_delta": 0.0, "skill_changes": {}}],
-  "relationship_deltas": [{"from_id": "<id>", "to_id": "<id>", "trust_delta": 0}],
-  "fiction_deltas": [{"fiction_id": "<id_or_null>", "action": "strengthen|weaken|spread_to|destroy|create", "target_believer_ids": [], "belief_strength_delta": 0.0, "new_fiction_name": null, "new_fiction_narrative": null, "new_fiction_type": null}],
-  "zone_deltas": [{"character_id": "<id>", "new_zone_id": "<zone_id>"}],
-  "resource_deltas": [{"zone_id": "<zone_id_or_null>", "resource": "food|wood|stone|medicine|hides", "delta": 0.0}],
-  "new_event": "one-line past-tense summary",
-  "death_occurred": false,
-  "death_character_id": null,
-  "death_cause": null
-}
-
-Rules:
-- hunger_delta: negative when player expends energy (hunting=-15 to -25), positive when eating (+20 to +40)
-- health_delta: only when injured or healed
-- reputation_delta: social actions change this (-20 to +20 range)
-- fatigue_delta: positive when resting, negative when exerting (-10 to -20)
-- Always include the narrative field with the full text
-- Set death_occurred=true only for actual character death"""
-
-_MISTRAL_BASE_URL = "https://api.mistral.ai/v1"
+DELTA_SYSTEM_PROMPT = """You are a game state parser for a hunter-gatherer RPG.
+Given what the player did and the narrative of what happened, return the structured state delta.
+Use exact IDs from the provided maps. Use empty lists when nothing changed.
+Only set death_occurred=true for actual character death."""
 
 
-def _client() -> AsyncOpenAI:
-    return AsyncOpenAI(
-        api_key=os.environ.get("MISTRAL_API_KEY"),
-        base_url=_MISTRAL_BASE_URL,
+def _narrative_agent() -> Agent[None, str]:
+    return Agent(
+        MistralModel("mistral-large-latest", api_key=os.environ.get("MISTRAL_API_KEY")),
+        system_prompt=GM_SYSTEM_PROMPT,
+        result_type=str,
+    )
+
+
+def _delta_agent() -> Agent[None, GMResponse]:
+    return Agent(
+        MistralModel("mistral-small-latest", api_key=os.environ.get("MISTRAL_API_KEY")),
+        system_prompt=DELTA_SYSTEM_PROMPT,
+        result_type=GMResponse,
     )
 
 
@@ -71,19 +56,11 @@ async def stream_gm_narrative(
     player_input: str,
 ) -> AsyncGenerator[str, None]:
     context = build_context(state)
-    stream = await _client().chat.completions.create(
-        model="mistral-large-latest",
-        max_tokens=1200,
-        stream=True,
-        messages=[
-            {"role": "system", "content": GM_SYSTEM_PROMPT},
-            {"role": "user", "content": f"{context}\n\nPLAYER: {player_input}"},
-        ],
-    )
-    async for chunk in stream:
-        content = chunk.choices[0].delta.content
-        if content:
-            yield content
+    async with _narrative_agent().run_stream(
+        f"{context}\n\nPLAYER: {player_input}"
+    ) as result:
+        async for chunk in result.stream_text(delta=True):
+            yield chunk
 
 
 async def get_gm_delta(
@@ -106,26 +83,7 @@ PLAYER_ID: {state.player_id}
 WHAT PLAYER DID: {player_input}
 
 NARRATIVE (what happened):
-{narrative}
+{narrative}"""
 
-Output the JSON delta."""
-
-    response = await _client().chat.completions.create(
-        model="mistral-small-latest",
-        max_tokens=800,
-        messages=[
-            {"role": "system", "content": DELTA_SYSTEM_PROMPT},
-            {"role": "user", "content": prompt},
-        ],
-    )
-
-    raw = response.choices[0].message.content.strip()
-    if raw.startswith("```"):
-        lines = raw.split("\n")
-        raw = "\n".join(lines[1:-1])
-
-    try:
-        data = json.loads(raw)
-        return GMResponse(**data)
-    except Exception:
-        return GMResponse(narrative=narrative, new_event=f"Turn {state.current_turn}")
+    result = await _delta_agent().run(prompt)
+    return result.data
