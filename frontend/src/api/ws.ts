@@ -13,7 +13,9 @@ export function connectWebSocket(sessionId: string): WebSocket {
     ws.close();
   }
 
-  const wsUrl = `ws://localhost:8000/ws/${sessionId}`;
+  const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+  const host = window.location.host;
+  const wsUrl = `${proto}//${host}/ws/${sessionId}`;
   ws = new WebSocket(wsUrl);
 
   ws.onopen = () => {

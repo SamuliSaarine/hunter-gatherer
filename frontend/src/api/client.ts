@@ -1,4 +1,4 @@
-const API_BASE = "/api";
+const API_BASE = `${window.location.protocol}//${window.location.host}/api`;
 
 export async function createNewGame(
   playerName: string,
