@@ -1,7 +1,8 @@
 import json
 import os
 from typing import AsyncGenerator
-import anthropic
+
+from openai import AsyncOpenAI
 
 from game.state import GameState, GMResponse
 from .context_builder import build_context
@@ -55,25 +56,34 @@ Rules:
 - Always include the narrative field with the full text
 - Set death_occurred=true only for actual character death"""
 
+_MISTRAL_BASE_URL = "https://api.mistral.ai/v1"
+
+
+def _client() -> AsyncOpenAI:
+    return AsyncOpenAI(
+        api_key=os.environ.get("MISTRAL_API_KEY"),
+        base_url=_MISTRAL_BASE_URL,
+    )
+
 
 async def stream_gm_narrative(
     state: GameState,
     player_input: str,
 ) -> AsyncGenerator[str, None]:
-    client = anthropic.AsyncAnthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
     context = build_context(state)
-
-    async with client.messages.stream(
-        model="claude-sonnet-4-6",
+    stream = await _client().chat.completions.create(
+        model="mistral-large-latest",
         max_tokens=1200,
-        system=GM_SYSTEM_PROMPT,
-        messages=[{
-            "role": "user",
-            "content": f"{context}\n\nPLAYER: {player_input}",
-        }],
-    ) as stream:
-        async for chunk in stream.text_stream:
-            yield chunk
+        stream=True,
+        messages=[
+            {"role": "system", "content": GM_SYSTEM_PROMPT},
+            {"role": "user", "content": f"{context}\n\nPLAYER: {player_input}"},
+        ],
+    )
+    async for chunk in stream:
+        content = chunk.choices[0].delta.content
+        if content:
+            yield content
 
 
 async def get_gm_delta(
@@ -81,8 +91,6 @@ async def get_gm_delta(
     player_input: str,
     narrative: str,
 ) -> GMResponse:
-    client = anthropic.AsyncAnthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
-
     char_map = "\n".join(f"  {c.id}: {c.name} (player={c.is_player})" for c in state.characters)
     fiction_map = "\n".join(f"  {f.id}: {f.name}" for f in state.shared_fictions)
     zone_map = "\n".join(f"  {z.id}: {z.name}" for z in state.world_zones)
@@ -102,15 +110,16 @@ NARRATIVE (what happened):
 
 Output the JSON delta."""
 
-    response = await client.messages.create(
-        model="claude-haiku-4-5-20251001",
+    response = await _client().chat.completions.create(
+        model="mistral-small-latest",
         max_tokens=800,
-        system=DELTA_SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": prompt}],
+        messages=[
+            {"role": "system", "content": DELTA_SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ],
     )
 
-    raw = response.content[0].text.strip()
-    # Strip markdown code fences if present
+    raw = response.choices[0].message.content.strip()
     if raw.startswith("```"):
         lines = raw.split("\n")
         raw = "\n".join(lines[1:-1])
@@ -118,5 +127,5 @@ Output the JSON delta."""
     try:
         data = json.loads(raw)
         return GMResponse(**data)
-    except (json.JSONDecodeError, ValueError, Exception):
+    except Exception:
         return GMResponse(narrative=narrative, new_event=f"Turn {state.current_turn}")

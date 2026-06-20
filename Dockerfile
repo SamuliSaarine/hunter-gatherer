@@ -12,7 +12,7 @@ WORKDIR /app
 
 # Install Python deps (no uv needed in prod — plain pip is fine)
 COPY backend/pyproject.toml ./
-RUN pip install --no-cache-dir fastapi "uvicorn[standard]" pydantic anthropic python-dotenv websockets aiofiles
+RUN pip install --no-cache-dir fastapi "uvicorn[standard]" pydantic openai python-dotenv websockets aiofiles
 
 COPY backend/ ./
 COPY --from=frontend-build /app/frontend/dist ./frontend/dist
