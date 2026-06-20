@@ -10,7 +10,13 @@ from fastapi.responses import FileResponse
 from api.routes import router
 from api.websocket import ws_router
 
-FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
+# Docker layout: main.py at /app/, dist at /app/frontend/dist
+# Dev layout:    main.py at backend/, dist at ../frontend/dist
+_here = Path(__file__).parent
+FRONTEND_DIST = next(
+    (p for p in [_here / "frontend" / "dist", _here.parent / "frontend" / "dist"] if p.exists()),
+    _here / "frontend" / "dist",
+)
 
 app = FastAPI(title="Hunter-Gatherer", version="0.1.0")
 
@@ -34,6 +40,10 @@ async def health() -> dict:
 # Serve built frontend — must come AFTER API routes
 if FRONTEND_DIST.exists():
     app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
+
+    @app.get("/")
+    async def spa_root() -> FileResponse:
+        return FileResponse(FRONTEND_DIST / "index.html")
 
     @app.get("/{full_path:path}")
     async def spa_fallback(full_path: str) -> FileResponse:
