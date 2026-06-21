@@ -8,6 +8,7 @@ import StatPanel from "./components/StatPanel";
 import ZonePanel from "./components/ZonePanel";
 import BandPanel from "./components/BandPanel";
 import MobileStats from "./components/MobileStats";
+import MythPanel from "./components/MythPanel";
 
 function GameLayout() {
   return (
