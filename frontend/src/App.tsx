@@ -7,7 +7,7 @@ import PlayerInput from "./components/PlayerInput";
 import StatPanel from "./components/StatPanel";
 import ZonePanel from "./components/ZonePanel";
 import BandPanel from "./components/BandPanel";
-import MythPanel from "./components/MythPanel";
+import MobileStats from "./components/MobileStats";
 
 function GameLayout() {
   return (
@@ -15,6 +15,7 @@ function GameLayout() {
       <header class="game-header">
         <span class="header-title">HUNTER-GATHERER</span>
         <span class="header-band">{store.gameState?.band.name ?? ""}</span>
+        <MobileStats />
         <span class={`conn-dot ${store.isConnected ? "connected" : "disconnected"}`}>●</span>
       </header>
 
